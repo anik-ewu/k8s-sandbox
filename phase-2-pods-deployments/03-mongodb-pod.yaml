@@ -1,0 +1,64 @@
+# ============================================================
+# PHASE 2 - STEP 3: MongoDB Pod
+# ============================================================
+# We are running MongoDB as a Pod in Kubernetes.
+# Image pulled directly from Docker Hub: mongo
+#
+# ⚠️  NOTE ON CREDENTIALS:
+# We are setting username/password as plain env vars here
+# for learning purposes. In production, you NEVER do this.
+# In Phase 4 (Secrets), we will move these into K8s Secrets.
+# ============================================================
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mongodb-pod             # The unique name for this Pod in the cluster
+  labels:
+    app: mongodb                # Label so other resources (Services) can find this Pod
+spec:
+  containers:
+    - name: mongodb-container
+      image: mongo               # Official MongoDB image from Docker Hub
+      ports:
+        - containerPort: 27017  # Default MongoDB port (inside the container)
+      env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret       # Must match metadata.name in mongo-secret.yaml
+              key: mongo-root-username   # Must match the key under data in mongo-secret.yaml
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret       # Same secret file
+              key: mongo-root-password   # Must match the key under data in mongo-secret.yaml
+
+---
+# ============================================================
+# Internal Service for MongoDB
+# ============================================================
+# Type: ClusterIP (default) — only accessible INSIDE the cluster.
+# No external traffic can reach this. That's the point!
+#
+# Other pods (like Mongo Express) will connect using:
+#   Host: mongodb-service   ← the Service name acts as a DNS hostname
+#   Port: 27017
+#
+# K8s internal DNS resolves "mongodb-service" → ClusterIP automatically.
+# ============================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service          # This name is the internal DNS hostname
+spec:
+  selector:
+    app: mongodb                 # Finds Pods with label app=mongodb (our mongodb-pod)
+  ports:
+    - protocol: TCP
+      port: 27017                # Port the Service exposes inside the cluster
+      targetPort: 27017          # Port the container is actually listening on
+  # type: ClusterIP is the DEFAULT — no need to specify it explicitly
+  # but we leave this comment here so you know it's intentional
+
