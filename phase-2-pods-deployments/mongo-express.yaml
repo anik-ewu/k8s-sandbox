@@ -1,0 +1,92 @@
+# ============================================================
+# PHASE 2 - STEP 4: Mongo Express — Deployment + NodePort Service
+# ============================================================
+# Using a Deployment instead of a bare Pod because:
+#   ✅ Self-healing  — if the pod crashes, K8s recreates it
+#   ✅ Rolling updates — update the image with zero downtime
+#   ✅ Scalable       — change replicas: N to run more instances
+#
+# HOW IT CONNECTS TO MONGODB:
+#   ME_CONFIG_MONGODB_SERVER → "mongodb-service"
+#   K8s DNS resolves that name → ClusterIP → mongodb-pod:27017
+#
+#   Credentials come from the same mongodb-secret used by mongodb-pod.
+# ============================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-express
+  labels:
+    app: mongo-express
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo-express            # Must match template.metadata.labels below
+  template:
+    metadata:
+      labels:
+        app: mongo-express          # Pod label — also targeted by the Service
+    spec:
+      containers:
+        - name: mongo-express
+          image: mongo-express:1.0.2   # Compatible with MongoDB 5+
+          ports:
+            - containerPort: 8081      # Default Mongo Express port
+
+          env:
+            # ── Full MongoDB connection URL ───────────────────────────
+            # mongo-express 1.0+ uses ME_CONFIG_MONGODB_URL instead of
+            # ME_CONFIG_MONGODB_SERVER (which was removed in 1.0).
+            # Format: mongodb://<user>:<pass>@<service>:<port>/
+            # Credentials are still pulled from the Secret.
+            - name: ME_CONFIG_MONGODB_ADMINUSERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: mongo-root-username
+
+            - name: ME_CONFIG_MONGODB_ADMINPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: mongo-root-password
+
+            - name: ME_CONFIG_MONGODB_URL
+              value: "mongodb://username:password@mongodb-service:27017/"
+              # ⚠️  Credentials hardcoded here for simplicity.
+              # In Phase 4 we will use Secrets properly in the URL.
+
+            # ── Disable HTTP Basic Auth popup ────────────────────
+            # mongo-express 1.0+ enables basicAuth by default ("admin:pass").
+            # Set to false so the UI opens directly — matching tutorial behaviour.
+            - name: ME_CONFIG_BASICAUTH
+              value: "false"
+
+---
+# ============================================================
+# External Service for Mongo Express (NodePort)
+# ============================================================
+# NodePort exposes the Deployment on a port of the Minikube node
+# so we can reach the web UI from our local browser.
+#
+# Access via:
+#   minikube service mongo-express-service
+#
+# NodePort range: 30000–32767
+# ============================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-express-service
+spec:
+  selector:
+    app: mongo-express              # Targets pods created by the Deployment above
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 8081                    # ClusterIP port (internal cluster traffic)
+      targetPort: 8081              # Container port Mongo Express listens on
+      nodePort: 30081               # External port on the Minikube node

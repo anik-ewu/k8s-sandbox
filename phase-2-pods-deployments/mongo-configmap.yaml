@@ -1,0 +1,20 @@
+# ============================================================
+# ConfigMap — Non-sensitive MongoDB configuration
+# ============================================================
+# ConfigMaps store plain (non-secret) configuration as key-value pairs.
+#
+# WHAT GOES HERE vs. Secrets:
+#   ConfigMap → non-sensitive config  (URLs, hostnames, feature flags)
+#   Secret     → sensitive data       (passwords, tokens, certs)
+#
+# The value "mongodb-service" is the K8s internal DNS name of the
+# ClusterIP service defined in 03-mongodb-pod.yaml.
+# K8s DNS automatically resolves it → ClusterIP → Pod.
+# ============================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-configmap
+data:
+  database_url: mongodb-service     # Internal DNS name of the MongoDB ClusterIP service
