@@ -63,41 +63,155 @@ Stage 1: Fundamental Concepts  →  Stage 2: Work with K8s  →  Stage 3: Deep D
 **Essential kubectl commands:**
 ```bash
 minikube start                        # Start local cluster
+minikube stop                         # Pause cluster (resources preserved)
 kubectl get nodes                     # Check cluster health
 kubectl apply -f <file.yaml>          # Deploy any manifest
+kubectl delete -f <file.yaml>         # Remove resources defined in file
 kubectl get pods                      # List pods
+kubectl get all                       # See everything in namespace
 kubectl get pods -l app=taskmanager   # Filter by label
 kubectl describe pod <pod-name>       # Full details + events
+kubectl describe service <svc-name>   # Inspect a service + endpoints
 kubectl logs <pod-name>               # Container logs
-kubectl delete pod <pod-name>         # Delete a pod
-kubectl get all                       # See everything in namespace
+kubectl delete pod <pod-name>         # Delete a pod (bare pod stays dead)
+kubectl delete deployment <name>      # Delete deployment + all its pods
 ```
 📎 [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)
 
 ### ✅ 2.2 — K8s Manifest Files
 - YAML files that declare the **desired state** of your cluster
+- Multiple resources can live in one file — separated by `---`
 - Files live in `phase-2-pods-deployments/`
-  - `01-pod.yaml` — Raw Pod (for learning only)
-  - `02-deployment.yaml` — Deployment with `replicas: 3`, readiness/liveness probes
 
-**Key insight from practice:**
+| File | Kind(s) | Purpose |
+|---|---|---|
+| `01-pod.yaml` | Pod | Bare Pod concept (learning only) |
+| `02-deployment.yaml` | Deployment | 3 replicas, readiness/liveness probes |
+| `03-mongodb-pod.yaml` | Pod + Service | MongoDB pod + internal ClusterIP service |
+| `mongo-secret.yaml` | Secret | base64-encoded credentials |
+| `mongo-configmap.yaml` | ConfigMap | Non-sensitive config (DB hostname) |
+| `mongo-express.yaml` | Deployment + Service | Mongo Express UI + NodePort service |
+
+**Key insights from practice:**
 - Deleted a Pod → K8s spawned a replacement in **seconds** (self-healing proven!)
-- `CrashLoopBackOff` = app is crashing (expected — no MongoDB yet)
+- `CrashLoopBackOff` = app is crashing on startup (often bad health probe config)
+- **Never delete individual pods** managed by a Deployment — delete the Deployment instead
+- **Secret must be applied before the Pod** that references it, or pod fails with `CreateContainerConfigError`
 
-### 🔜 2.3 — Troubleshooting
+### ✅ 2.3 — Pod vs Deployment — When to Use Each
+
+| | Pod | Deployment |
+|---|---|---|
+| **If it crashes** | ❌ Gone forever | ✅ Auto-recreated |
+| **Scaling** | ❌ Manual | ✅ Change `replicas: N` |
+| **Rolling updates** | ❌ No | ✅ Zero downtime |
+| **Use for** | Learning / one-off debug | All real applications |
+
+> ⚠️ For databases — use **StatefulSet** (not Pod or Deployment). Covered in Stage 3.
+
+### ✅ 2.4 — Secret vs ConfigMap — What Goes Where
+
+| | ConfigMap | Secret |
+|---|---|---|
+| **Data type** | Non-sensitive | Sensitive |
+| **Examples** | URLs, hostnames, flags | Passwords, tokens, certs |
+| **Stored as** | Plain text | base64 encoded |
+| **Your case** | `mongodb-service` (hostname) | username & password |
+
+```bash
+# Generate base64 values for secrets
+echo -n 'mypassword' | base64
+```
+
+> ⚠️ base64 is **encoding**, not encryption. Never commit secret files to git.
+
+### ✅ 2.5 — Services — How Pods Talk to Each Other
+
+| Service Type | Accessible From | Use Case |
+|---|---|---|
+| **ClusterIP** (default) | Inside cluster only | Pod-to-pod communication |
+| **NodePort** | Your local machine (via Minikube) | Dev/testing access |
+| **LoadBalancer** | Public internet | Cloud production deployments |
+
+**Key insight:** Service names act as **internal DNS hostnames**.
+`mongodb-service` → K8s resolves it → ClusterIP → Pod. No IPs needed.
+
+```
+Browser
+  │ NodePort :30081
+  ▼
+mongo-express (Deployment)
+  │ ClusterIP: mongodb-service:27017
+  ▼
+mongodb-pod
+```
+
+### ✅ 2.6 — Namespaces
+
+Namespaces are **virtual clusters** inside your physical cluster. Use them to organise and isolate resources.
+
+**4 Default Namespaces:**
+| Namespace | Purpose |
+|---|---|
+| `default` | Where your resources live if no namespace specified |
+| `kube-system` | K8s internal components — never touch! |
+| `kube-public` | Publicly accessible cluster info |
+| `kube-node-lease` | Heartbeat tracking for node availability |
+
+**4 Reasons to Use Namespaces:**
+
+1. **Structure Components** — group resources by team, app, or environment
+   ```
+   namespace: database     → MongoDB, Redis
+   namespace: monitoring   → Prometheus, Grafana
+   namespace: app-staging  → API (staging)
+   namespace: app-prod     → API (production)
+   ```
+
+2. **Avoid Conflicts** — two teams can both have a resource named `my-app` without clashing
+   ```bash
+   kubectl get pod my-app -n team-a   # team-a's app
+   kubectl get pod my-app -n team-b   # team-b's app — no conflict
+   ```
+
+3. **Share Services** — central tools like Prometheus can be shared across namespaces
+   ```
+   # Full DNS format to access service in another namespace:
+   <service-name>.<namespace>.svc.cluster.local
+   ```
+   > ⚠️ ConfigMaps and Secrets **cannot** be shared across namespaces — each namespace needs its own copy.
+
+4. **Access & Resource Limits** — RBAC per namespace + CPU/memory quotas per team
+   ```yaml
+   kind: ResourceQuota
+   spec:
+     hard:
+       cpu: "2"       # Max 2 CPUs for this namespace
+       memory: 2Gi    # Max 2GB RAM
+       pods: "10"     # Max 10 pods
+   ```
+
+**Useful commands:**
+```bash
+kubectl get namespaces                        # List all namespaces
+kubectl apply -f file.yaml -n my-namespace    # Deploy to specific namespace
+kubectl get pods -n kube-system               # View system pods
+```
+
+### 🔜 2.7 — Troubleshooting
 - Check container logs: `kubectl logs <pod>`
 - Check cluster status: `kubectl get nodes`, `kubectl get pods -A`
 - Inspect events: `kubectl describe pod <pod>`
 - Verify networking: `kubectl get svc`, `kubectl get endpoints`
 
-### 🔜 2.4 — Common Misconfigurations & Bad Practices
+### 🔜 2.8 — Common Misconfigurations & Bad Practices
 - Hardcoding secrets in manifests
 - No resource limits (CPU/memory) on containers
 - No readiness/liveness probes → broken pods receive traffic
 - Using `latest` image tag in production
 - Running everything in the `default` namespace
 
-### 🔜 2.5 — Helm Charts
+### 🔜 2.9 — Helm Charts
 - Package manager for K8s (like npm, but for K8s apps)
 - Learn: What is Helm, what are Helm charts, when to use them
 - Especially useful for deploying 3rd-party services (e.g. MongoDB, Nginx)
@@ -147,14 +261,14 @@ We are deploying `sabbirhasananik/docker-sandbox:latest` — a Node.js Task Mana
 
 | Phase | Status | Folder |
 |---|---|---|
-| Pod + Deployment | ✅ Done | `phase-2-pods-deployments/` |
-| Services (ClusterIP, NodePort) | 🔜 Next | `phase-3-services/` |
-| ConfigMaps + Secrets | 🔜 | `phase-4-config/` |
-| Ingress | 🔜 | `phase-5-ingress/` |
-| Persistent Volumes (MongoDB) | 🔜 | `phase-6-volumes/` |
-| StatefulSet for MongoDB | 🔜 | `phase-6-volumes/` |
-| Deployment Strategies | 🔜 | `phase-7-strategies/` |
-| Helm Charts | 🔜 | `phase-8-helm/` |
+| Pod + Deployment basics | ✅ Done | `phase-2-pods-deployments/` |
+| MongoDB + Mongo Express demo | ✅ Done | `phase-2-pods-deployments/` |
+| Namespaces | ✅ Done | — |
+| Ingress | 🔜 Next | `phase-3-ingress/` |
+| Helm | 🔜 | `phase-4-helm/` |
+| Persistent Volumes | 🔜 | `phase-5-volumes/` |
+| StatefulSet for MongoDB | 🔜 | `phase-5-volumes/` |
+| Deployment Strategies | 🔜 | `phase-6-strategies/` |
 
 ---
 
@@ -164,4 +278,13 @@ We are deploying `sabbirhasananik/docker-sandbox:latest` — a Node.js Task Mana
 docker desktop   # Must be running
 minikube start   # Start cluster
 kubectl get nodes # Verify: STATUS=Ready
+
+# Apply the demo project (in order!)
+kubectl apply -f mongo-secret.yaml       # Secret first!
+kubectl apply -f mongo-configmap.yaml
+kubectl apply -f 03-mongodb-pod.yaml
+kubectl apply -f mongo-express.yaml
+
+# Open Mongo Express in browser
+minikube service mongo-express-service
 ```
