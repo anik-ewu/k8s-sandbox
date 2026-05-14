@@ -1,0 +1,62 @@
+# ============================================================
+# PHASE 2 - STEP 2: Your First Deployment
+# ============================================================
+# A Deployment is the REAL way to run apps in Kubernetes.
+# It's a controller that watches over your Pods and ensures
+# the desired state (e.g. replicas: 3) is always maintained.
+#
+# If a Pod crashes → Deployment creates a new one. Auto-healed!
+# If you update the image → Deployment does a rolling update.
+#                           Zero downtime!
+#
+# Think of it as: `docker-compose up --scale api=3`
+# ... but with auto-healing and rolling updates built in.
+# ============================================================
+
+apiVersion: apps/v1       # Deployments live in the "apps" API group
+kind: Deployment
+metadata:
+  name: taskmanager-deployment
+  labels:
+    app: taskmanager
+spec:
+  replicas: 3             # "I want 3 copies of my Pod running at all times."
+                          # K8s will FIGHT to keep this number. Kill a Pod?
+                          # K8s spawns a new one within seconds!
+
+  selector:               # HOW does this Deployment know WHICH Pods to manage?
+    matchLabels:
+      app: taskmanager    # It manages Pods that have the label: app=taskmanager
+
+  template:               # This is the BLUEPRINT for the Pods it will create.
+    metadata:
+      labels:
+        app: taskmanager  # Every Pod created MUST have this label (matches selector above)
+    spec:
+      containers:
+        - name: taskmanager-container
+          image: sabbirhasananik/docker-sandbox:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+
+          # ---- Health Checks (The K8s Superpower) ----
+          # K8s uses these to know if your app is truly alive.
+          # Without these, K8s thinks a container is healthy the
+          # moment it starts — even if it's still crashing inside!
+
+          readinessProbe:         # "Is this Pod READY to receive traffic?"
+            httpGet:              # K8s will call GET /health on port 3000
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5  # Wait 5s before first check (app needs boot time)
+            periodSeconds: 10       # Check every 10 seconds
+
+          livenessProbe:          # "Is this Pod still ALIVE (not deadlocked)?"
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15 # Wait longer — app must be fully up first
+            periodSeconds: 20

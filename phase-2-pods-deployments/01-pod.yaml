@@ -1,0 +1,29 @@
+# ============================================================
+# PHASE 2 - STEP 1: Your First Pod
+# ============================================================
+# A Pod is the smallest deployable unit in Kubernetes.
+# It wraps one (or more) containers, just like `docker run`.
+#
+# Think of it as: `docker run -p 3000:3000 sabbirhasananik/docker-sandbox:latest`
+# ... but described as a YAML file.
+# ============================================================
+
+apiVersion: v1          # The API version for this resource type
+kind: Pod               # The type of resource we are creating
+metadata:
+  name: taskmanager-pod # The unique name for this Pod in the cluster
+  labels:
+    app: taskmanager    # Labels are key-value tags. Think of them as sticky notes.
+                        # They are HOW Services find Pods later!
+spec:
+  containers:
+    - name: taskmanager-container   # Name of the container inside the Pod
+      image: sabbirhasananik/docker-sandbox:latest  # Your Docker Hub image
+      ports:
+        - containerPort: 3000       # The port your app listens on INSIDE the container
+      env:
+        - name: PORT
+          value: "3000"
+        # NOTE: We are skipping MONGODB_URI for now.
+        # The API will start but DB calls will fail — that's fine!
+        # We'll fix this in Phase 4 (Secrets) and connect MongoDB in Phase 3.
