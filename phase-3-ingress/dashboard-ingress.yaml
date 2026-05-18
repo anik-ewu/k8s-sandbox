@@ -1,0 +1,45 @@
+# ============================================================
+# PHASE 3 — Ingress: Dashboard Example
+# ============================================================
+# WHAT IS INGRESS?
+# Ingress is a K8s resource that manages external HTTP/HTTPS
+# access to services inside the cluster.
+#
+# WITHOUT Ingress (NodePort way):
+#   Browser → NodePort (e.g. :30081) → Service → Pod
+#   Problem: ugly ports, no HTTPS, no domain routing
+#
+# WITH Ingress:
+#   Browser → domain.com → Ingress → Service → Pod
+#   Benefits: clean URLs, HTTPS/TLS, path/host routing
+#
+# HOW IT WORKS:
+#   1. You create an Ingress resource (this file)
+#   2. An Ingress Controller (nginx) reads this resource
+#   3. It configures itself to route traffic accordingly
+#
+# ⚠️  NOTE ON API VERSION:
+# The tutorial uses networking.k8s.io/v1beta1 (deprecated).
+# We use networking.k8s.io/v1 — the current stable version.
+# The backend syntax changed slightly between versions.
+# ============================================================
+
+apiVersion: networking.k8s.io/v1        # v1beta1 is deprecated — always use v1
+kind: Ingress
+metadata:
+  name: dashboard-ingress
+  namespace: kubernetes-dashboard        # Must be in the SAME namespace as the Service
+spec:
+  rules:
+    - host: dashboard.com                # The domain name — must be configured in /etc/hosts
+                                         # for local testing (we'll do this after applying)
+      http:
+        paths:
+          - path: /                      # Route ALL paths under dashboard.com to this service
+            pathType: Prefix             # Prefix = matches /  /abc  /abc/xyz etc.
+                                         # Other option: Exact = only matches exactly /
+            backend:
+              service:
+                name: kubernetes-dashboard   # Must match the Service name in kubernetes-dashboard ns
+                port:
+                  number: 80               # Must match the Service port (not containerPort)
