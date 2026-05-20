@@ -1,0 +1,30 @@
+# ============================================================
+# Custom values for bitnami/mongodb chart
+# ============================================================
+# We only override what we need.
+# Everything else uses the chart's defaults.
+#
+# Install:  helm install mongodb bitnami/mongodb -f mongo-values.yaml
+# Upgrade:  helm upgrade mongodb bitnami/mongodb -f mongo-values.yaml
+# Remove:   helm uninstall mongodb
+# ============================================================
+
+architecture: standalone          # "standalone" = single node (good for dev)
+                                   # "replicaset" = 3 nodes (production)
+
+auth:
+  enabled: true
+  rootUser: admin
+  rootPassword: "password123"      # ⚠️ Use a real secret manager in production
+
+resources:
+  limits:
+    cpu: 500m                      # Max 0.5 CPU core
+    memory: 768Mi                  # Max 768MB RAM  ← bumped to demo upgrade
+  requests:
+    cpu: 100m                      # Guaranteed 0.1 CPU core
+    memory: 256Mi                  # Guaranteed 256MB RAM
+
+persistence:
+  enabled: true                    # Keep data across Pod restarts
+  size: 1Gi                        # PVC size — 1 gigabyte
