@@ -389,11 +389,11 @@ helm status <release-name>                           # Inspect a release
 ```
 
 **Files:**
-- `phase-4-helm/` — Helm exercises (coming soon)
+- `phase-4-helm/mongo-values.yaml` — Custom values for bitnami/mongodb chart (install, upgrade, rollback practiced)
 
 ---
 
-### 🔜 3.2 — Volumes & Persistent Storage
+### ✅ 3.2 — Volumes & Persistent Storage (High-Level Overview)
 
 **Why:**
 Pods are stateless by default. Every time a Pod restarts, its filesystem is wiped. For databases or any app that writes data, you need storage that outlives the Pod lifecycle.
@@ -526,8 +526,8 @@ We are deploying `sabbirhasananik/docker-sandbox:latest` — a Node.js Task Mana
 | Namespaces | ✅ Done | — |
 | Ingress — dashboard demo (basic) | ✅ Done | `phase-3-ingress/` |
 | Ingress — real-world (multi-path, TLS, error page) | 🔜 Later | `phase-3-ingress/` |
-| Helm | 🔜 Next | `phase-4-helm/` |
-| Persistent Volumes | 🔜 | `phase-5-volumes/` |
+| Helm | ✅ Done | `phase-4-helm/` |
+| Persistent Volumes (overview) | ✅ Done | — |
 | StatefulSet for MongoDB | 🔜 | `phase-5-volumes/` |
 | Deployment Strategies | 🔜 | `phase-6-strategies/` |
 
